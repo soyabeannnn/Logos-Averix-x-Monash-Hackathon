@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from logos import db, llm, pipeline, service  # noqa: E402
+from logos import config, db, llm, pipeline, service  # noqa: E402
 from logos.compare import compare, mismatched_fields, verdict  # noqa: E402
 from logos.escalation import disagreement_reasons, low_confidence_reason  # noqa: E402
 from logos.fields import FIELDS, normalize_label  # noqa: E402
@@ -120,6 +120,7 @@ def test_pipeline_escalates_missing_field_with_evidence(monkeypatch):
 
 
 def test_pipeline_escalates_when_retry_disagrees(monkeypatch):
+    monkeypatch.setattr(config, "CONSISTENCY_CHECK", True)
     stub_llm(monkeypatch)
     calls = {"n": 0}
     real = llm.extract_fields
@@ -204,3 +205,33 @@ def test_cannot_resolve_with_missing_fields(store):
     with pytest.raises(service.ServiceError) as e:
         service.resolve(store, "Ana")
     assert e.value.status == 409
+
+
+def test_delete_removes_email_and_its_edit_log(store):
+    service.apply_edit(store, "BL", "consignee", "BETA CO", "Ana", "typo")
+    assert service.delete_emails([store]) == {"deleted": 1}
+    with pytest.raises(service.ServiceError) as e:
+        service.detail(store)
+    assert e.value.status == 404
+    with db.get_engine().connect() as c:
+        assert c.execute(sa.select(sa.func.count()).select_from(db.edit_log)).scalar() == 0
+    with pytest.raises(service.ServiceError):
+        service.delete_emails([])
+
+
+def test_category_change_logs_and_switches_pipeline_state(store):
+    calls = []
+
+    def fake_process(email, cat):
+        calls.append(cat)
+        return {"confidence": None, "rationale": "manual", "status": "OK", "si_fields": GOOD, "bl_fields": GOOD,
+                "si_evidence": {}, "bl_evidence": {}, "si_text": "s", "bl_text": "b", "reasons": []}
+    d = service.change_category(store, "SPAM", "Ana", "not a real request", fake_process)
+    assert d["category"] == "SPAM" and d["status"] == "CLASSIFIED" and d["comparison"] == [] and calls == []
+    assert d["edit_log"][0]["field"] == "category" and d["edit_log"][0]["old_value"] == "BL_COMPARISON"
+    d = service.change_category(store, "BL_COMPARISON", "Ana", "it is a comparison", fake_process)
+    assert calls == ["BL_COMPARISON"] and d["status"] == "OK" and len(d["edit_log"]) == 2
+    with pytest.raises(service.ServiceError):
+        service.change_category(store, "GENERAL", "Ana", " ", fake_process)
+    with pytest.raises(service.ServiceError):
+        service.change_category(store, "BL_COMPARISON", "Ana", "same", fake_process)

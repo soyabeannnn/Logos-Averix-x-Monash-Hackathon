@@ -41,7 +41,7 @@ def extract_document(text, doc, consistency=None):
     return fields, evidence, first["doc_type"], reasons
 
 
-def process_email(email, inbox):
+def process_email(email, inbox, forced_category=None):
     paths = email.get("attachments") or []
     row = {
         "id": email["email_id"], "sender": email.get("from"), "subject": email.get("subject"),
@@ -54,7 +54,11 @@ def process_email(email, inbox):
     excerpt = f"Subject: {row['subject']}\n\n{(row['body'] or '')[:600]}"
 
     try:
-        c = llm.classify_email(email, [p.rsplit("/", 1)[-1] for p in paths])
+        if forced_category:
+            c = {"category": forced_category, "confidence": None, "shipment_ref": None,
+                 "rationale": "Category set manually by a reviewer"}
+        else:
+            c = llm.classify_email(email, [p.rsplit("/", 1)[-1] for p in paths])
     except llm.LLMError as e:
         row["category"] = "UNKNOWN"
         row["reasons"].append(reason("llm_error", f"Classification failed after retry: {e}", excerpt))
@@ -63,7 +67,7 @@ def process_email(email, inbox):
 
     row.update(category=c["category"], confidence=c["confidence"],
                rationale=c["rationale"], shipment_ref=c.get("shipment_ref"))
-    low = low_confidence_reason(c["confidence"], config.LOW_CONFIDENCE, excerpt)
+    low = None if forced_category else low_confidence_reason(c["confidence"], config.LOW_CONFIDENCE, excerpt)
     if low:
         row["reasons"].append(low)
 

@@ -109,6 +109,51 @@ def review_queue():
     return [{**summary(r), "reasons": r["reasons"], "escalated_by": r["escalated_by"]} for r in rows]
 
 
+CATEGORIES = ("BL_COMPARISON", "SI_REQUEST", "INVOICE_QUERY", "GENERAL", "SPAM")
+RESET_COLUMNS = ("confidence", "rationale", "status", "si_fields", "bl_fields", "si_evidence",
+                 "bl_evidence", "si_text", "bl_text", "reasons")
+
+
+def change_category(email_id, new_category, editor, reason_text, process_fn):
+    """Reviewer override of the category. process_fn(email_dict, category) -> pipeline row."""
+    if new_category not in CATEGORIES:
+        raise ServiceError(400, "unknown category")
+    if not (editor or "").strip():
+        raise ServiceError(400, "editor name is required")
+    if not (reason_text or "").strip():
+        raise ServiceError(400, "a reason is required")
+    with db.get_engine().connect() as c:
+        row = _get(c, email_id)
+    if row["category"] == new_category:
+        raise ServiceError(400, "email already has this category")
+    email = {"email_id": email_id, "from": row["sender"], "subject": row["subject"],
+             "body": row["body"], "attachments": row["attachments"] or []}
+    new = process_fn(email, new_category) if new_category == "BL_COMPARISON" else {
+        "confidence": None, "rationale": "Category set manually by a reviewer", "status": "CLASSIFIED",
+        "si_fields": None, "bl_fields": None, "si_evidence": None, "bl_evidence": None,
+        "si_text": None, "bl_text": None, "reasons": []}
+    values = {k: new[k] for k in RESET_COLUMNS}
+    values.update(category=new_category, resolved_by=None, resolved_at=None, escalated_by=None)
+    with db.get_engine().begin() as c:
+        c.execute(sa.update(db.emails).where(db.emails.c.id == email_id).values(**values))
+        c.execute(sa.insert(db.edit_log).values(
+            email_id=email_id, doc="EMAIL", field="category", old_value=row["category"],
+            new_value=new_category, editor=editor.strip(), reason=reason_text.strip(), timestamp=now()))
+    return detail(email_id)
+
+
+def delete_emails(ids):
+    ids = list(dict.fromkeys(ids))
+    if not ids:
+        raise ServiceError(400, "No emails selected")
+    with db.get_engine().begin() as c:
+        c.execute(sa.delete(db.edit_log).where(db.edit_log.c.email_id.in_(ids)))
+        res = c.execute(sa.delete(db.emails).where(db.emails.c.id.in_(ids)))
+    if res.rowcount == 0:
+        raise ServiceError(404, "Email not found")
+    return {"deleted": res.rowcount}
+
+
 def parse_value(field, raw):
     raw = (raw if raw is not None else "")
     raw = str(raw).strip()

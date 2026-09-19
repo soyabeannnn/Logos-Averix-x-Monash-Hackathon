@@ -40,7 +40,8 @@ CLASSIFY_TOOL = {
 }
 
 CLASSIFY_SYSTEM = """You triage a shipping-operations inbox. Classify each email as exactly one of:
-- BL_COMPARISON: asks to check/confirm/compare a Shipping Instruction (SI) against a draft Bill of Lading (BL); usually attaches both.
+- BL_COMPARISON: the sender supplies a Shipping Instruction (SI) and a draft Bill of Lading (BL) and asks for them to be checked/confirmed/compared ("attached are the SI and draft BL ... please check"); usually attaches both. Still BL_COMPARISON if the sender says the documents are attached but a file seems to be missing.
+  NOT BL_COMPARISON: a request that asks the recipient to SEND or PROVIDE a draft BL (e.g. "Please assist to send the draft BL for <ref> for checking asap", subjects like "Draft BL ... - amend BL 058"). Nothing is supplied to compare, so classify these as GENERAL.
 - SI_REQUEST: a new shipping instruction / booking request to be actioned (not a comparison of existing documents).
 - INVOICE_QUERY: a question about an invoice, charges, payment or billing.
 - GENERAL: any other legitimate business message.

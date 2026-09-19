@@ -19,8 +19,10 @@ from loader import Inbox  # noqa: E402
 log = logging.getLogger("logos.api")
 app = FastAPI(title="Logos")
 
-progress = {"running": False, "done": 0, "total": 0, "errors": 0, "started_at": None, "finished_at": None}
+progress = {"running": False, "cancelled": False, "done": 0, "total": 0, "errors": 0,
+            "started_at": None, "finished_at": None}
 _lock = threading.Lock()
+cancel_event = threading.Event()
 
 
 class EditIn(BaseModel):
@@ -63,19 +65,23 @@ def run_pipeline(force: bool):
     try:
         inbox = Inbox(config.DATA_SOURCE)
         emails = inbox.emails()
+        if config.LIMIT:
+            emails = emails[:config.LIMIT]
         if not force:
             done = service.processed_ids()
             emails = [e for e in emails if e["email_id"] not in done]
         progress.update(total=len(emails), done=0, errors=0)
 
         def work(e):
+            if cancel_event.is_set():
+                return
             service.save_row(_safe_process(e, inbox))
             progress["done"] += 1
 
         with ThreadPoolExecutor(max_workers=config.WORKERS) as ex:
             list(ex.map(work, emails))
     finally:
-        progress.update(running=False, finished_at=now())
+        progress.update(running=False, finished_at=now(), cancelled=cancel_event.is_set())
 
 
 @app.post("/process", status_code=202)
@@ -83,8 +89,17 @@ def process(force: bool = False):
     with _lock:
         if progress["running"]:
             raise HTTPException(409, "A processing run is already in progress")
-        progress.update(running=True, started_at=now(), finished_at=None)
+        cancel_event.clear()
+        progress.update(running=True, cancelled=False, started_at=now(), finished_at=None)
     threading.Thread(target=run_pipeline, args=(force,), daemon=True).start()
+    return progress
+
+
+@app.post("/process/cancel")
+def cancel_process():
+    if not progress["running"]:
+        raise HTTPException(409, "No processing run is in progress")
+    cancel_event.set()
     return progress
 
 
@@ -113,9 +128,37 @@ def get_source(email_id: str):
     return service.source(email_id)
 
 
+class DeleteIn(BaseModel):
+    ids: list[str]
+
+
+@app.post("/emails/batch-delete")
+def batch_delete(body: DeleteIn):
+    return service.delete_emails(body.ids)
+
+
+@app.delete("/emails/{email_id}")
+def delete_email(email_id: str):
+    return service.delete_emails([email_id])
+
+
 @app.post("/emails/{email_id}/edit")
 def edit(email_id: str, body: EditIn):
     return service.apply_edit(email_id, body.doc, body.field, body.new_value, body.editor, body.reason)
+
+
+class CategoryIn(BaseModel):
+    category: str
+    editor: str
+    reason: str
+
+
+@app.post("/emails/{email_id}/category")
+def change_category(email_id: str, body: CategoryIn):
+    inbox = Inbox(config.DATA_SOURCE)
+    return service.change_category(
+        email_id, body.category, body.editor, body.reason,
+        lambda e, cat: process_email(e, inbox, forced_category=cat))
 
 
 @app.post("/emails/{email_id}/escalate")

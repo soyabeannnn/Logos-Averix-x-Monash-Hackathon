@@ -1,0 +1,12 @@
+services:
+  logos:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    environment:
+      DATA_SOURCE: /app
+      DATABASE_URL: sqlite:////data/logos.db
+    volumes:
+      - logos-data:/data
+volumes:
+  logos-data:

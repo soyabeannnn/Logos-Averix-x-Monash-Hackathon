@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Logos - Shipping Document Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">L</div>
+      <div>
+        <div class="wordmark">Logos</div>
+        <div class="tagline">Shipping Document Verification</div>
+      </div>
+    </div>
+    <nav aria-label="Primary">
+      <a href="#/inbox" id="nav-inbox" class="nav-item">Inbox</a>
+      <a href="#/review" id="nav-review" class="nav-item">Needs Review <span id="nav-badge" class="badge" hidden></span></a>
+    </nav>
+    <div class="identity">
+      <label for="reviewer">Signed in as:</label>
+      <input id="reviewer" type="text" placeholder="Your name" autocomplete="name">
+    </div>
+  </aside>
+  <main id="main" tabindex="-1"></main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

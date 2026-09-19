@@ -67,8 +67,13 @@ def list_emails(category=None, status=None, q=None):
 
 def stats():
     with db.get_engine().connect() as c:
-        statuses = [r[0] for r in c.execute(sa.select(db.emails.c.status))]
+        rows = list(c.execute(sa.select(db.emails.c.status, db.emails.c.category)))
+    statuses = [r[0] for r in rows]
+    by_category = {}
+    for _, cat in rows:
+        by_category[cat] = by_category.get(cat, 0) + 1
     return {
+        "by_category": by_category,
         "total": len(statuses),
         "mismatches": statuses.count("MISMATCH"),
         "needs_review": statuses.count("NEEDS_REVIEW"),

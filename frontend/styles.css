@@ -168,3 +168,12 @@ h3 { font-size: 14px; font-weight: 600; margin: 14px 0 0; }
 .case > div:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .case-actions { flex: none; white-space: nowrap; }
 @media (max-width: 800px) { .case { flex-wrap: wrap; } }
+
+.detail-nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.stepper { display: flex; align-items: center; gap: 10px; }
+.btn.step { padding: 6px 14px; text-decoration: none; display: inline-block; }
+.btn.step.disabled { opacity: .4; cursor: not-allowed; border-color: var(--border); }
+
+.pill-btn .count { font-size: 12px; font-weight: 600; margin-left: 4px; padding: 0 6px; border-radius: 10px; background: var(--other-bg); color: var(--muted); }
+.pill-btn[aria-pressed=true] .count { background: #fff; color: var(--brand-dark); }
+td.idx { width: 1%; white-space: nowrap; font-variant-numeric: tabular-nums; }

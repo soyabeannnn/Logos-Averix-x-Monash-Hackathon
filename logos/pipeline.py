@@ -75,7 +75,6 @@ def process_email(email, inbox, forced_category=None):
         row["status"] = "NEEDS_REVIEW" if row["reasons"] else "CLASSIFIED"
         return row
 
-    si_fields, bl_fields = empty_fields(), empty_fields()
     for doc in ("SI", "BL"):
         key = doc.lower()
         path = find_attachment(paths, doc)

@@ -14,7 +14,7 @@ const STATUS_LABELS = { OK: "Matched", MISMATCH: "Mismatch", NEEDS_REVIEW: "Need
 const TRASH_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
 const $main = document.getElementById("main");
 const $reviewer = document.getElementById("reviewer");
-const state = { category: "", q: "", selected: new Set(), status: "" };
+const state = { category: "", q: "", selected: new Set(), status: "", navIds: [] };
 
 try { $reviewer.value = localStorage.getItem("logos.reviewer") || ""; } catch (e) { /* storage unavailable */ }
 $reviewer.addEventListener("input", () => {
@@ -82,7 +82,7 @@ async function renderInbox() {
     <div class="card table-card" id="table"></div>`;
   const pills = document.getElementById("pills");
   const opts = [["", "All"], ...Object.entries(CATEGORIES).filter(([k]) => k !== "UNKNOWN"), ["UNKNOWN", "Unclassified"]];
-  pills.innerHTML = opts.map(([k, l]) => `<button class="pill-btn" data-c="${k}" aria-pressed="${state.category === k}">${l}</button>`).join("");
+  pills.innerHTML = opts.map(([k, l]) => `<button class="pill-btn" data-c="${k}" aria-pressed="${state.category === k}">${l} <span class="count" aria-label="count"></span></button>`).join("");
   pills.addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     state.category = b.dataset.c; renderInbox();
@@ -104,6 +104,10 @@ async function renderInbox() {
 async function loadStats() {
   const s = await api("/stats");
   const cards = [["", "Total Processed", s.total], ["MISMATCH", "Mismatches Found", s.mismatches], ["NEEDS_REVIEW", "Needs Review", s.needs_review], ["OK", "Clean Matches", s.clean]];
+  document.querySelectorAll("#pills [data-c]").forEach(b => {
+    const n = b.dataset.c ? (s.by_category[b.dataset.c] || 0) : s.total;
+    b.querySelector(".count").textContent = n;
+  });
   const box = document.getElementById("stats");
   box.innerHTML = cards.map(([st, l, n]) => `<button class="stat" data-status="${st}" aria-pressed="${state.status === st}" title="Filter the table"><div class="n">${n}</div><div class="l">${l}</div></button>`).join("");
   box.querySelectorAll("[data-status]").forEach(b => b.addEventListener("click", () => {
@@ -116,15 +120,17 @@ async function loadTable() {
   if (state.q) params.set("q", state.q);
   if (state.status) params.set("status", state.status);
   const rows = await api("/emails?" + params);
+  state.navIds = rows.map(r => r.id);
   const el = document.getElementById("table");
   if (!el) return;
   if (!rows.length) {
     el.innerHTML = `<p class="empty" style="padding:18px">${state.category || state.q || state.status ? "No emails match this filter." : "No emails processed yet. Choose “Run pipeline” to process the inbox."}</p>`;
     return;
   }
-  el.innerHTML = `<table><thead><tr><th scope="col"><input type="checkbox" id="sel-all" aria-label="Select all shown emails"></th><th scope="col">Sender / Subject</th><th scope="col">Category</th><th scope="col">Status</th><th scope="col">Processed</th><th scope="col"><span style="position:absolute;left:-999px">Actions</span></th></tr></thead><tbody>${
-    rows.map(r => `<tr>
+  el.innerHTML = `<table><thead><tr><th scope="col"><input type="checkbox" id="sel-all" aria-label="Select all shown emails"></th><th scope="col">#</th><th scope="col">Sender / Subject</th><th scope="col">Category</th><th scope="col">Status</th><th scope="col">Processed</th><th scope="col"><span style="position:absolute;left:-999px">Actions</span></th></tr></thead><tbody>${
+    rows.map((r, i) => `<tr>
       <td><input type="checkbox" data-sel="${esc(r.id)}" aria-label="Select ${esc(r.id)}" ${state.selected.has(r.id) ? "checked" : ""}></td>
+      <td class="from idx" title="${esc(r.id)}">${i + 1}</td>
       <td><a class="subject-link" href="#/email/${esc(r.id)}"><span class="subject">${esc(r.subject)}</span></a><div class="from">${esc(r.sender)}</div></td>
       <td>${esc(CATEGORIES[r.category] || r.category)}${r.confidence != null ? `<div class="from">${Math.round(r.confidence * 100)}% conf.</div>` : ""}</td>
       <td>${pill(r.status)}</td>
@@ -191,6 +197,16 @@ async function renderDetail(id, openSource = false) {
   catch (e) { $main.innerHTML = `<p><a class="link" href="#/inbox">← Back to inbox</a></p><p class="err">${esc(e.message)}</p>`; return; }
 
   const isCmp = d.category === "BL_COMPARISON";
+  if (!state.navIds.includes(id)) {
+    try { state.navIds = (await api("/emails?status=" + encodeURIComponent(d.status))).map(r => r.id); }
+    catch (e) { state.navIds = [id]; }
+  }
+  const pos = state.navIds.indexOf(id), total = state.navIds.length;
+  const stepLink = (target, label) => target
+    ? `<a class="btn outline step" href="#/email/${esc(target)}">${label}</a>`
+    : `<span class="btn outline step disabled" aria-disabled="true">${label}</span>`;
+  const stepper = total > 1 ? `<nav class="stepper" aria-label="Browse cases">
+      ${stepLink(state.navIds[pos - 1], "← Previous")}<span class="from">${pos + 1} of ${total}</span>${stepLink(state.navIds[pos + 1], "Next →")}</nav>` : "";
   const mism = d.comparison.filter(r => r.match === false).length;
   const miss = d.comparison.filter(r => r.match === null).length;
   let banner;
@@ -200,7 +216,7 @@ async function renderDetail(id, openSource = false) {
   else banner = `<strong>Matched.</strong> All 7 fields agree between the SI and the draft BL.`;
   if (d.resolved_by) banner += ` Resolved by ${esc(d.resolved_by)} on ${esc(fmtTime(d.resolved_at))}.`;
 
-  $main.innerHTML = `<p><a class="link" href="#/inbox">← Back to inbox</a></p>
+  $main.innerHTML = `<div class="detail-nav"><a class="link" href="#/inbox">← Back to inbox</a>${stepper}</div>
     <h1>${esc(d.subject)}</h1>
     <div class="card"><dl class="meta">
       <div><dt>From</dt><dd>${esc(d.sender)}</dd></div>

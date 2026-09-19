@@ -4,7 +4,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -48,7 +48,8 @@ def _safe_process(email, inbox):
         return process_email(email, inbox)
     except Exception as e:  # never crash the run; park the email for a human
         log.exception("pipeline failed for %s", email.get("email_id"))
-        progress["errors"] += 1
+        with _lock:
+            progress["errors"] += 1
         return {
             "id": email["email_id"], "sender": email.get("from"), "subject": email.get("subject"),
             "body": email.get("body"), "attachments": email.get("attachments") or [],
@@ -76,7 +77,8 @@ def run_pipeline(force: bool):
             if cancel_event.is_set():
                 return
             service.save_row(_safe_process(e, inbox))
-            progress["done"] += 1
+            with _lock:
+                progress["done"] += 1
 
         with ThreadPoolExecutor(max_workers=config.WORKERS) as ex:
             list(ex.map(work, emails))

@@ -163,3 +163,8 @@ h3 { font-size: 14px; font-weight: 600; margin: 14px 0 0; }
 
 .cat-form label select, .cat-form label input { font-size: 15px; margin-top: 2px; display: block; }
 .cat-box .cat-form { margin-top: 14px; }
+
+.case { flex-wrap: nowrap; }
+.case > div:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.case-actions { flex: none; white-space: nowrap; }
+@media (max-width: 800px) { .case { flex-wrap: wrap; } }

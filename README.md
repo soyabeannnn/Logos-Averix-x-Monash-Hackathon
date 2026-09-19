@@ -245,5 +245,6 @@ there is no linter configuration in the repo (the code was checked with `pyflake
 - Email records carry no timestamp, so the UI's time column shows when Logos processed the email.
 - Field excerpts show what the model originally extracted; they do not change when a reviewer edits a value.
 - The reviewer name is a plain text input standing in for auth; nothing verifies it.
+- Prompt rules: emails asking for or delivering a new SI are `SI_REQUEST` ("New SI"); emails asking us to send a draft BL are `GENERAL`.
 - Deleted emails are re-processed the next time the pipeline runs.
 - The hackathon scoring uses five fixed categories, so no extra category (such as "Action item") was added.

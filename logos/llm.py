@@ -42,7 +42,7 @@ CLASSIFY_TOOL = {
 CLASSIFY_SYSTEM = """You triage a shipping-operations inbox. Classify each email as exactly one of:
 - BL_COMPARISON: the sender supplies a Shipping Instruction (SI) and a draft Bill of Lading (BL) and asks for them to be checked/confirmed/compared ("attached are the SI and draft BL ... please check"); usually attaches both. Still BL_COMPARISON if the sender says the documents are attached but a file seems to be missing.
   NOT BL_COMPARISON: a request that asks the recipient to SEND or PROVIDE a draft BL (e.g. "Please assist to send the draft BL for <ref> for checking asap", subjects like "Draft BL ... - amend BL 058"). Nothing is supplied to compare, so classify these as GENERAL.
-- SI_REQUEST: a new shipping instruction / booking request to be actioned (not a comparison of existing documents).
+- SI_REQUEST (shown to users as "New SI"): a request for a Shipping Instruction, or a call to action a new SI / booking. This includes emails that ask for an SI ("REQUEST SI", "SI NEEDED", "please submit/send the SI") and emails that deliver new shipping instruction details in the body to be actioned ("Please find Shipping instruction for <ref>. POL: ... POD: ... Shipper: ...", subjects like "CUST SI", "SI - <booking ref>"), usually with no attachments. It is NOT a comparison of an existing SI against a draft BL. Do not use it when "SI" only appears incidentally in an unrelated email (e.g. a berthing report or newsletter); those are GENERAL.
 - INVOICE_QUERY: a question about an invoice, charges, payment or billing.
 - GENERAL: any other legitimate business message.
 - SPAM: unsolicited marketing, phishing or irrelevant mail.

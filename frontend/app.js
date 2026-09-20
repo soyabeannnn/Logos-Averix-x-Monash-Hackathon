@@ -229,6 +229,10 @@ async function renderDetail(id, openSource = false) {
       ${d.resolved_by ? "" : `<button class="btn outline" id="esc">Escalate to Team</button>`}
       <button class="btn outline" id="view-src" aria-expanded="false" aria-controls="src-panel">View Source</button>
       ${d.resolved_by ? "" : `<button class="btn solid" id="resolve">Mark Resolved</button>`}
+      <span class="export">
+        <a class="btn outline" href="/emails/${encodeURIComponent(d.id)}/report?format=pdf" download>Download PDF</a>
+        <a class="btn outline" href="/emails/${encodeURIComponent(d.id)}/report?format=docx" download>Download Word</a>
+      </span>
     </div>` : ""}
     <section class="card" id="src-panel" ${isCmp ? "hidden" : ""} aria-labelledby="src-h"><h2 id="src-h">Source</h2><div id="src-body">Loading…</div></section>
     ${d.reasons.length ? `<section class="card"><h2>Open escalations</h2>${reasonsHtml(d.reasons)}</section>` : ""}

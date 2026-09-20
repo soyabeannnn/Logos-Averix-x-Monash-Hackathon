@@ -5,11 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, service
+from . import config, reports, service
 from .escalation import reason
 from .pipeline import now, process_email
 
@@ -125,6 +125,19 @@ def get_email(email_id: str):
     return service.detail(email_id)
 
 
+@app.get("/emails/{email_id}/report")
+def get_report(email_id: str, format: str = "pdf"):
+    fmt = reports.FORMATS.get(format)
+    if fmt is None:
+        raise service.ServiceError(400, f"format must be one of: {', '.join(reports.FORMATS)}")
+    detail = service.detail(email_id)
+    if detail["category"] != "BL_COMPARISON":
+        raise service.ServiceError(400, "Reports are only available for document-comparison emails")
+    content = fmt.render(reports.build_report(detail))
+    return Response(content, media_type=fmt.mime, headers={
+        "Content-Disposition": f'attachment; filename="logos-{email_id}.{fmt.extension}"'})
+
+
 @app.get("/emails/{email_id}/source")
 def get_source(email_id: str):
     return service.source(email_id)
@@ -178,4 +191,13 @@ def review_queue():
     return service.review_queue()
 
 
-app.mount("/", StaticFiles(directory=config.ROOT / "frontend", html=True), name="frontend")
+class RevalidatingStaticFiles(StaticFiles):
+    """Serve the frontend with Cache-Control: no-cache so browsers always pick up new versions (ETag keeps it cheap)."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+app.mount("/", RevalidatingStaticFiles(directory=config.ROOT / "frontend", html=True), name="frontend")

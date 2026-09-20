@@ -177,3 +177,6 @@ h3 { font-size: 14px; font-weight: 600; margin: 14px 0 0; }
 .pill-btn .count { font-size: 12px; font-weight: 600; margin-left: 4px; padding: 0 6px; border-radius: 10px; background: var(--other-bg); color: var(--muted); }
 .pill-btn[aria-pressed=true] .count { background: #fff; color: var(--brand-dark); }
 td.idx { width: 1%; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.actions .export { margin-left: auto; display: flex; gap: 10px; }
+.actions a.btn { text-decoration: none; display: inline-block; }

@@ -80,7 +80,7 @@ Docker volume, and the dataset is read from the image, so rebuild after changing
 ### 6. Verify the setup
 
 ```bash
-pytest                              # 29 tests, no API key needed
+pytest                              # 37 tests, no API key needed
 ```
 
 If emails all land in **Needs Review** with "API call failed" reasons, open one and read the error:
@@ -126,6 +126,8 @@ delete `logos.db` (or call `POST /process?force=true`) so those emails are proce
   progress and has a **Cancel** button (in-flight emails finish first); a pop-up reports the result.
 - **Comparison detail**: metadata, a side-by-side SI vs BL table with mismatches highlighted, a verdict
   banner, **Escalate to Team**, **View Source** (raw email body and SI/BL text) and **Mark Resolved**.
+  **Download PDF** and **Download Word** export the case as a report (metadata, verdict, comparison
+  table, open escalations and edit history). **Previous / Next** steps through the list you came from.
   Click a field name to see the source excerpt it was extracted from. **Edit** on a row corrects the
   SI or BL value (a reason is required). **Wrong? Change** corrects the category. The Edit History
   section lists every correction, or "No edits recorded for this case".
@@ -177,6 +179,7 @@ logos/
   compare.py     deterministic diff and verdict
   escalation.py  escalation reasons (code, message, evidence)
   pipeline.py    classify -> extract -> compare -> escalate for one email
+  reports/       downloadable case reports: model.py (content), pdf.py, word.py, FORMATS registry
   service.py     storage operations: edits + audit log, category, escalate, resolve, delete, queries
   db.py          SQLAlchemy Core tables (emails, edit_log)
   api.py         FastAPI endpoints, background run, static frontend
@@ -192,6 +195,7 @@ loader.py        provided dataset loader (Inbox)
 | `GET /emails?category=&status=&q=` | list emails |
 | `GET /emails/{id}` | detail: comparison rows, escalations, evidence, edit log |
 | `GET /emails/{id}/source` | email body and raw SI/BL text |
+| `GET /emails/{id}/report?format=pdf\|docx` | download the comparison report (comparison emails only) |
 | `POST /emails/{id}/edit` | `{doc: SI\|BL, field, new_value, editor, reason}` |
 | `POST /emails/{id}/category` | `{category, editor, reason}` |
 | `POST /emails/{id}/escalate`, `/resolve` | `{editor, note}` |
@@ -208,8 +212,8 @@ Interactive API docs are at http://localhost:8000/docs.
 pytest
 ```
 
-29 tests cover label normalization, the comparison diff, each escalation trigger, malformed-LLM retry,
-edit and audit-log behaviour with verdict recompute, category changes, and deletion. The LLM is stubbed,
+37 tests cover label normalization, the comparison diff, each escalation trigger, malformed-LLM retry,
+edit and audit-log behaviour with verdict recompute, category changes, deletion, and PDF/Word report generation. The LLM is stubbed,
 so no API key is needed. Prompt wording changes (such as the classification rules) are not covered by
 the tests and should be checked with a real run.
 

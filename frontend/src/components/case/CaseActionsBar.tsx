@@ -30,7 +30,7 @@ export function CaseActionsBar({ id, resolved, sourceOpen, escalating, onToggleS
           Mark Resolved
         </Button>
       )}
-      <span className="ml-auto flex gap-2.5">
+      <span className="flex flex-wrap gap-2.5 md:ml-auto">
         <DownloadLink variant="accent" href={api.reportUrl(id, "pdf")}>
           Download PDF
         </DownloadLink>

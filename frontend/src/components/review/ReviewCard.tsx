@@ -42,7 +42,7 @@ export function ReviewCard({ item, onChanged }: ReviewCardProps) {
             {item.sender} · {CATEGORY_LABELS[item.category] ?? item.category}
           </div>
         </div>
-        <div className="flex flex-none items-center gap-3.5 whitespace-nowrap">
+        <div className="flex w-full flex-wrap items-center gap-x-3.5 gap-y-2.5 md:w-auto md:flex-none md:flex-nowrap md:whitespace-nowrap">
           {item.category === "BL_COMPARISON" && (
             <Link href={`/emails/${encodeURIComponent(item.id)}`} className="font-medium text-link hover:underline">
               Open case →

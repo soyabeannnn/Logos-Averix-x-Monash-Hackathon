@@ -10,15 +10,15 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from .model import Report
 
-BORDER = colors.HexColor("#E4E1DB")
-MUTED = colors.HexColor("#6B6862")
-HEADER_FILL = colors.HexColor("#F1F0EB")
+BORDER = colors.HexColor("#E3DBEE")
+MUTED = colors.HexColor("#5B4F73")
+HEADER_FILL = colors.HexColor("#F3EEFC")
 STATUS_COLORS = {  # (background, text)
-    "OK": ("#E6F4EA", "#1E7B34"),
-    "MISMATCH": ("#FDECEA", "#B3261E"),
-    "NEEDS_REVIEW": ("#FBF1D6", "#8A6D0B"),
+    "OK": ("#CDEFE0", "#146B45"),
+    "MISMATCH": ("#FBD5E3", "#9B1C4A"),
+    "NEEDS_REVIEW": ("#FFEDB5", "#6B4E00"),
 }
-ROW_TINT = {"Mismatch": "#FDECEA", "Missing": "#FBF1D6"}
+ROW_TINT = {"Mismatch": "#FBD5E3", "Missing": "#FFEDB5"}
 CONTENT_WIDTH = 17 * cm
 
 _base = getSampleStyleSheet()
@@ -81,7 +81,7 @@ def render_pdf(report: Report) -> bytes:
         bottomMargin=1.8 * cm, title=f"Logos report {report.email_id}", author="Logos")
 
     story = [
-        Paragraph('<font color="#B95314">Logos</font> - SI vs draft BL comparison report', SMALL),
+        Paragraph('<font color="#D9703A">Logos</font> - SI vs draft BL comparison report', SMALL),
         _p(report.title, H1),
         _grid([[_p(k, SMALL), _p(v)] for k, v in report.meta], [5 * cm, 12 * cm], header=False),
         Spacer(1, 10),

@@ -9,14 +9,14 @@ from docx.shared import Cm, Pt, RGBColor
 from .model import Report
 
 STATUS_COLORS = {  # (background, text)
-    "OK": ("E6F4EA", "1E7B34"),
-    "MISMATCH": ("FDECEA", "B3261E"),
-    "NEEDS_REVIEW": ("FBF1D6", "8A6D0B"),
+    "OK": ("CDEFE0", "146B45"),
+    "MISMATCH": ("FBD5E3", "9B1C4A"),
+    "NEEDS_REVIEW": ("FFEDB5", "6B4E00"),
 }
-ROW_TINT = {"Mismatch": "FDECEA", "Missing": "FBF1D6"}
-HEADER_FILL = "F1F0EB"
-BRAND = RGBColor(0xB9, 0x53, 0x14)
-MUTED = RGBColor(0x6B, 0x68, 0x62)
+ROW_TINT = {"Mismatch": "FBD5E3", "Missing": "FFEDB5"}
+HEADER_FILL = "F3EEFC"
+BRAND = RGBColor(0xD9, 0x70, 0x3A)
+MUTED = RGBColor(0x5B, 0x4F, 0x73)
 
 
 def _shade(cell, fill):

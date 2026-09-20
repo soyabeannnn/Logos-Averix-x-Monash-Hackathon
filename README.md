@@ -250,5 +250,18 @@ there is no linter configuration in the repo (the code was checked with `pyflake
 - Field excerpts show what the model originally extracted; they do not change when a reviewer edits a value.
 - The reviewer name is a plain text input standing in for auth; nothing verifies it.
 - Prompt rules: emails asking for or delivering a new SI are `SI_REQUEST` ("New SI"); emails asking us to send a draft BL are `GENERAL`.
+- Theme: flat, playful design on an eight-colour palette defined as tokens at the top of
+  `frontend/styles.css` (tangerine for main actions, sky for secondary buttons, sunshine for badges and
+  highlights, bubblegum/mint/lavender for stat cards and tags, plum for text and outlines, cream page
+  background). Link text uses a darker blue than Sky so it stays readable (4.9:1). Text on the tangerine
+  buttons is white (3.3:1, below the 4.5:1 AA guideline); plum text there would give 4.5:1. Status colours
+  (pink, green, amber) are tinted from the palette but stay distinct so meaning never depends on brand
+  colour alone. Reports use the same palette.
+- Prompt rules: emails asking for or delivering a new SI are `SI_REQUEST` ("New SI"); emails asking us to send a draft BL are `GENERAL`.
+- Theme: flat design on a six-colour palette defined as tokens at the top of `frontend/styles.css`
+  (burnt orange for primary actions, deep teal for links and secondary buttons, midnight navy for text
+  and the sidebar, honey for highlights, mist for cards, warm cream background). Text on the orange is white
+  (3.3:1, below the 4.5:1 AA guideline; a darker orange such as #B85A25 would fix that). Status colours (red/green/amber) stay separate so meaning is
+  never carried by brand colour alone. Reports use the same palette.
 - Deleted emails are re-processed the next time the pipeline runs.
 - The hackathon scoring uses five fixed categories, so no extra category (such as "Action item") was added.

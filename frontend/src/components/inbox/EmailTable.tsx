@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TrashIcon } from "@/components/ui/Icons";
 import { CATEGORY_LABELS } from "@/lib/constants";
@@ -13,7 +14,7 @@ interface EmailTableProps {
   selected: ReadonlySet<string>;
   /** Query string carried to the detail page so Previous/Next follows this list. */
   query: string;
-  emptyMessage: string;
+  emptyMessage: ReactNode;
   onToggle: (id: string, checked: boolean) => void;
   onToggleAll: (checked: boolean) => void;
   onDelete: (id: string) => void;

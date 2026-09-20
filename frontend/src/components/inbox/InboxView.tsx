@@ -2,13 +2,16 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { LinkButton } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { FormError } from "@/components/ui/Fields";
 import { useProcessRun } from "@/hooks/useProcessRun";
 import { useRemote } from "@/hooks/useRemote";
 import { api } from "@/lib/api";
+import { CATEGORY_LABELS, STATUS_LABELS } from "@/lib/constants";
 import { errorText } from "@/lib/format";
 import { filtersFromParams, filtersToQuery, type EmailFilters } from "@/lib/filters";
+import type { Category, Status } from "@/lib/types";
 import { useStats } from "@/providers/StatsProvider";
 import { useToast } from "@/providers/ToastProvider";
 import { CategoryPills } from "./CategoryPills";
@@ -16,6 +19,16 @@ import { EmailTable } from "./EmailTable";
 import { RunControls } from "./RunControls";
 import { SearchBox } from "./SearchBox";
 import { StatCards } from "./StatCards";
+
+/** e.g. "Invoice + Mismatch + “acme”", so an empty result explains which filters combine. */
+function describeFilters({ category, status, q }: EmailFilters): string {
+  const parts = [
+    category && (CATEGORY_LABELS[category as Category] ?? category),
+    status && (STATUS_LABELS[status as Status] ?? status),
+    q && `“${q}”`,
+  ].filter(Boolean);
+  return parts.join(" + ");
+}
 
 export function InboxView() {
   const router = useRouter();
@@ -100,11 +113,16 @@ export function InboxView() {
           selected={selected}
           query={filtersToQuery(filters)}
           emptyMessage={
-            emails.loading
-              ? "Loading..."
-              : hasFilters
-                ? "No emails match this filter."
-                : "No emails processed yet. Choose “Run pipeline” to process the inbox."
+            emails.loading ? (
+              "Loading..."
+            ) : hasFilters ? (
+              <>
+                No emails match {describeFilters(filters)}.{" "}
+                <LinkButton onClick={() => router.replace(pathname)}>Clear filters</LinkButton>
+              </>
+            ) : (
+              "No emails processed yet. Choose “Run pipeline” to process the inbox."
+            )
           }
           onToggle={toggle}
           onToggleAll={toggleAll}

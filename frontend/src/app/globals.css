@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Every colour used in the UI is defined here once, so the theme
+ * can be changed in this file alone (utilities like bg-tangerine come from these).
+ */
+@theme {
+  /* Palette */
+  --color-tangerine: #d9703a; /* main actions */
+  --color-sunshine: #ffc93c; /* badges, highlights */
+  --color-bubblegum: #f58ab3; /* cards, illustrations */
+  --color-sky: #4cb5f5; /* secondary buttons */
+  --color-mint: #86ddb8; /* success, fresh accents */
+  --color-lavender: #bda9f2; /* soft fills, tags */
+  --color-plum: #2d1e4a; /* text and outlines */
+  --color-cream: #fff6e9; /* page background */
+
+  /* Derived */
+  --color-lavender-soft: #f3eefc;
+  --color-line: #e3dbee; /* hairline dividers inside cards */
+  --color-muted: #5b4f73; /* secondary text (7:1 on cream) */
+  --color-link: #1d6fb8; /* darker Sky so link text stays readable (4.9:1 on cream) */
+
+  /* Status (semantic, independent of the brand palette) */
+  --color-bad: #9b1c4a;
+  --color-bad-bg: #fbd5e3;
+  --color-ok: #146b45;
+  --color-ok-bg: #cdefe0;
+  --color-warn: #6b4e00;
+  --color-warn-bg: #ffedb5;
+  --color-other: #4b3a80;
+  --color-other-bg: #e4dbf9;
+
+  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-plum);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-plum);
+  outline-offset: 2px;
+}
+
+/* Focus rings need a light colour on the dark sidebar. */
+.sidebar :focus-visible {
+  outline-color: var(--color-sunshine);
+}

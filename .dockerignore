@@ -2,3 +2,6 @@
 logos.db
 __pycache__/
 .git/
+frontend/
+frontend-legacy/
+tests/

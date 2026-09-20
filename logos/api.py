@@ -6,7 +6,6 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import config, reports, service
@@ -115,6 +114,11 @@ def list_emails(category: Optional[str] = None, status: Optional[str] = None, q:
     return service.list_emails(category, status, q)
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.get("/stats")
 def stats():
     return service.stats()
@@ -189,15 +193,3 @@ def resolve(email_id: str, body: ActorIn):
 @app.get("/review-queue")
 def review_queue():
     return service.review_queue()
-
-
-class RevalidatingStaticFiles(StaticFiles):
-    """Serve the frontend with Cache-Control: no-cache so browsers always pick up new versions (ETag keeps it cheap)."""
-
-    async def get_response(self, path, scope):
-        response = await super().get_response(path, scope)
-        response.headers["Cache-Control"] = "no-cache"
-        return response
-
-
-app.mount("/", RevalidatingStaticFiles(directory=config.ROOT / "frontend", html=True), name="frontend")

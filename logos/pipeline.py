@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from . import config, llm
 from .compare import compare, verdict
-from .documents import attachment_text, is_readable
+from .documents import SCANNED_PDF_NOTE, attachment_text, is_readable, scanned_pdf_bytes
 from .escalation import (
     disagreement_reasons, low_confidence_reason, missing_value_reasons, reason,
 )
@@ -26,15 +26,19 @@ def empty_fields():
     return {f: None for f in FIELDS}
 
 
-def extract_document(text, doc, consistency=None):
-    """Extract one document. Returns (fields, evidence, doc_type, reasons)."""
+def extract_document(text, doc, consistency=None, pdf=None):
+    """Extract one document. Returns (fields, evidence, doc_type, reasons).
+
+    `pdf` carries the raw bytes of a scanned PDF so the model reads the page images itself.
+    """
     consistency = config.CONSISTENCY_CHECK if consistency is None else consistency
-    first = llm.extract_fields(text, doc)
+    extra = {"pdf": pdf} if pdf else {}
+    first = llm.extract_fields(text, doc, **extra)
     fields = {f: first["fields"][f]["value"] for f in FIELDS}
     evidence = {f: first["fields"][f]["evidence"] for f in FIELDS}
     reasons = []
     if consistency and first["doc_type"] == doc:
-        second = llm.extract_fields(text, doc)
+        second = llm.extract_fields(text, doc, **extra)
         s_fields = {f: second["fields"][f]["value"] for f in FIELDS}
         s_ev = {f: second["fields"][f]["evidence"] for f in FIELDS}
         reasons += disagreement_reasons(doc, fields, s_fields, evidence, s_ev)
@@ -84,19 +88,23 @@ def process_email(email, inbox, forced_category=None):
                 "missing_attachment", f"No {doc} attachment found",
                 f"Attachments on email: {', '.join(paths) or 'none'}", doc))
         else:
+            open_error = None
             try:
                 text = attachment_text(inbox, path)
+                pdf = scanned_pdf_bytes(inbox, path, text)
             except Exception as e:
-                text = ""
+                text, pdf, open_error = "", None, e
+            row[f"{key}_text"] = SCANNED_PDF_NOTE if pdf else text
+            if open_error:
                 row["reasons"].append(reason(
-                    "unreadable", f"{doc} could not be opened: {e}", path, doc))
-            row[f"{key}_text"] = text
-            if text and not is_readable(text):
+                    "unreadable", f"{doc} could not be opened: {open_error}", path, doc))
+            elif not pdf and not is_readable(text):
                 row["reasons"].append(reason(
-                    "unreadable", f"{doc} has no extractable text (scanned image?)", text[:600] or path, doc))
-            elif text:
+                    "unreadable", f"{doc} has no extractable text", text[:600] or path, doc))
+            else:
+                text = SCANNED_PDF_NOTE if pdf else text
                 try:
-                    fields, evidence, doc_type, extra = extract_document(text, doc)
+                    fields, evidence, doc_type, extra = extract_document(text, doc, pdf=pdf)
                     if doc_type != doc:
                         row["reasons"].append(reason(
                             "wrong_doc_type", f"Attachment named {doc} looks like a {doc_type} document",

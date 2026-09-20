@@ -1,12 +1,21 @@
 services:
-  logos:
+  api:
     build: .
-    ports: ["8000:8000"]
+    ports: ["8000:8000"]   # exposed for the interactive API docs at /docs
     env_file: .env
     environment:
       DATA_SOURCE: /app
       DATABASE_URL: sqlite:////data/logos.db
     volumes:
       - logos-data:/data
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_URL: http://api:8000
+    ports: ["3000:3000"]
+    depends_on: [api]
+
 volumes:
   logos-data:

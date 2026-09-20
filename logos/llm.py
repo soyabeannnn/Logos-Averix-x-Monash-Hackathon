@@ -1,4 +1,5 @@
 """Anthropic calls with forced tool output (fixed JSON schema). One retry, then LLMError."""
+import base64
 import logging
 
 from . import config
@@ -173,9 +174,24 @@ def classify_email(email, attachment_names, model=None):
     )
 
 
-def extract_fields(text, expected_doc, model=None):
-    """Returns {doc_type, fields: {name: {value, evidence}}}."""
-    user = f"Expected document type: {expected_doc}\n\n--- DOCUMENT START ---\n{text[:12000]}\n--- DOCUMENT END ---"
+def _pdf_block(pdf):
+    return {"type": "document",
+            "source": {"type": "base64", "media_type": "application/pdf",
+                       "data": base64.b64encode(pdf).decode("ascii")}}
+
+
+def extract_fields(text, expected_doc, model=None, pdf=None):
+    """Returns {doc_type, fields: {name: {value, evidence}}}.
+
+    `pdf` (raw bytes) is for scanned PDFs with no text layer: Claude reads the pages directly,
+    so `text` is ignored.
+    """
+    if pdf:
+        user = [_pdf_block(pdf),
+                {"type": "text", "text": f"Expected document type: {expected_doc}\n\n"
+                                         "The document is the attached PDF (scanned pages)."}]
+    else:
+        user = f"Expected document type: {expected_doc}\n\n--- DOCUMENT START ---\n{text[:12000]}\n--- DOCUMENT END ---"
     return _with_retry(
         lambda: _call_tool(model or config.EXTRACT_MODEL, EXTRACT_SYSTEM, user, EXTRACT_TOOL, 2000),
         _validate_extraction,

@@ -14,6 +14,7 @@ container count, gross weight (kg). The SI is the source of truth.
 ### 1. Prerequisites
 
 - **Python 3.10 or newer** (check with `python --version`).
+- **Node.js 20.9 or newer** (check with `node --version`) for the web frontend.
 - **An Anthropic API key with credits**: create one at https://console.anthropic.com (Settings, API Keys)
   and add credits under Billing. A Claude.ai chat subscription does not work for API calls.
 - **The dataset**: an `inbox/` folder (email JSON files) and an `attachments/` folder at the repo root,
@@ -32,6 +33,11 @@ python -m venv .venv
 source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\Activate.ps1
 
 pip install -r requirements.txt
+
+# frontend dependencies (Next.js); run npm from inside the frontend folder
+cd frontend
+npm install
+cd ..
 ```
 
 ### 3. Add your API key
@@ -56,22 +62,44 @@ CONSISTENCY_CHECK=false
 LIMIT=10
 ```
 
-### 4. Start the server
+### 4. Start both servers (two terminals)
+
+Logos is two programs: a Python API (backend) and a Next.js website (frontend). **Keep two terminal
+windows or tabs open**, one for each. The website only shows data while the backend is running.
+
+**Terminal 1, backend** (repo root, virtual environment active):
 
 ```bash
 python -m uvicorn logos.api:app --port 8000
 ```
 
-Use `python -m uvicorn` rather than bare `uvicorn`; on Windows the `uvicorn` script is often not on
-the PATH. Add `--reload` while developing so the server restarts when Python files change.
-The database (`logos.db`) is created automatically on first start.
+Wait for `Uvicorn running on http://127.0.0.1:8000`.
 
-**Docker alternative** (after creating `.env`): `docker compose up --build`. The database lives in a
-Docker volume, and the dataset is read from the image, so rebuild after changing the data.
+**Terminal 2, frontend:**
+
+```bash
+cd frontend
+npm run dev
+```
+
+Then open **http://localhost:3000** (the website). The backend on port 8000 has no web page of its own:
+opening it shows `{"detail":"Not Found"}`, which is normal. Its interactive API docs are at
+http://localhost:8000/docs.
+
+Use `python -m uvicorn` rather than bare `uvicorn`; on Windows the `uvicorn` script is often not on
+the PATH. Add `--reload` to the backend command while developing so it restarts when Python files
+change. The database (`logos.db`) is created automatically on first start.
+
+**Docker alternative** (after creating `.env`): `docker compose up --build` starts both, then open
+http://localhost:3000. The database lives in a Docker volume, and the dataset is read from the image,
+so rebuild after changing the data. (Not tested on every platform; if it misbehaves, use the two
+terminals above.)
+
+**Production build of the frontend:** `cd frontend && npm run build && npm start`.
 
 ### 5. Use it
 
-1. Open http://localhost:8000.
+1. Open http://localhost:3000.
 2. Type your name under **Signed in as** (bottom left). It is attached to every edit you make.
 3. Click **Run pipeline**. Progress appears next to the button, and a pop-up reports the result.
 4. Review results in the Inbox, open comparison emails with **View →**, and clear escalated cases
@@ -80,12 +108,61 @@ Docker volume, and the dataset is read from the image, so rebuild after changing
 ### 6. Verify the setup
 
 ```bash
-pytest                              # 37 tests, no API key needed
+pytest                              # backend: 41 tests, no API key needed
+cd frontend && npm test             # frontend: 12 tests
 ```
 
 If emails all land in **Needs Review** with "API call failed" reasons, open one and read the error:
-it is almost always a missing or invalid key, or no API credits. Fix `.env`, restart the server, then
+it is almost always a missing or invalid key, or no API credits. Fix `.env`, restart the backend, then
 delete `logos.db` (or call `POST /process?force=true`) so those emails are processed again.
+
+### macOS setup
+
+Works on Intel and Apple Silicon MacBooks. Open the **Terminal** app and run these in order.
+
+```bash
+# 1. Command line tools (gives you git). Skip if `git --version` already works.
+xcode-select --install
+
+# 2. Python 3.10+ and Node.js. The Python that ships with macOS is too old.
+#    Install Homebrew first if needed: https://brew.sh
+brew install python@3.12 node
+
+# 3. Get the code
+git clone <repo-url>
+cd Logos-Averix-x-Monash-Hackathon
+
+# 4. Backend: isolated environment and dependencies
+python3 -m venv .venv
+source .venv/bin/activate           # your prompt now starts with (.venv)
+python3 -m pip install -r requirements.txt
+
+# 5. API key
+cp .env.example .env
+open -e .env                        # set ANTHROPIC_API_KEY=sk-ant-... and save
+
+# 6. Frontend dependencies
+(cd frontend && npm install)
+
+# 7. Start the backend (leave this Terminal tab running)
+python3 -m uvicorn logos.api:app --port 8000
+```
+
+Open a **second Terminal tab** (`Cmd+T`) for the frontend:
+
+```bash
+cd Logos-Averix-x-Monash-Hackathon/frontend
+npm run dev
+```
+
+Then open http://localhost:3000.
+
+- Use `python3` and `python3 -m pip`; a bare `python` or `pip` often does not exist.
+- Run `source .venv/bin/activate` again in every new Terminal tab before starting the backend.
+- If Python came from python.org and API calls fail with `CERTIFICATE_VERIFY_FAILED`, run
+  `/Applications/Python\ 3.x/Install\ Certificates.command` once, then restart the backend.
+- `Ctrl+C` stops a server. Hard-refresh the browser with `Cmd+Shift+R`.
+- `.env` is hidden in Finder; press `Cmd+Shift+.` to show it, or use `open -e .env`.
 
 ### Troubleshooting
 
@@ -93,7 +170,11 @@ delete `logos.db` (or call `POST /process?force=true`) so those emails are proce
 |---|---|
 | `uvicorn` is not recognised | use `python -m uvicorn ...` |
 | `No module named ...` | run `pip install -r requirements.txt` in the active environment |
-| A button or feature does nothing / "Method Not Allowed" | the server is running old code; restart it (or use `--reload`) and hard-refresh the page (Ctrl+F5) |
+| The page is stuck on "Loading...", or shows "Internal Server Error" (also when clicking Run pipeline) | the backend is not running on port 8000. Start it in Terminal 1 and refresh. If it is running, check that `API_URL` points to it |
+| `{"detail":"Not Found"}` in the browser | you opened the backend (port 8000). Open http://localhost:3000 instead |
+| `npm error ENOENT ... package.json` | you ran `npm` from the repo root. Run `cd frontend` first |
+| Port 3000 or 8000 already in use | stop the other process, or use `npm run dev -- -p 3001` / `--port 8001` (and set `API_URL` for the frontend) |
+| A button or feature does nothing / "Method Not Allowed" | the backend is running old code; restart it (or use `--reload`) and hard-refresh the page (Ctrl+F5) |
 | Run processes fewer emails than expected | `LIMIT` is set in `.env`; set it to `0` or remove it |
 | Old results after changing models or prompts | previously processed emails are kept; delete `logos.db` and re-run |
 | Inbox is empty and Run pipeline does nothing | `inbox/` and `attachments/` are not where `DATA_SOURCE` points |
@@ -174,7 +255,7 @@ resolved marker. Resolving or re-categorising a case also clears the Inbox filte
 logos/
   config.py      settings from environment / .env
   fields.py      the 7 fields and label aliases
-  documents.py   txt / pdf / docx / xlsx attachment -> text
+  documents.py   txt / pdf / docx / xlsx attachment -> text (scanned PDFs are sent to the model as PDFs)
   llm.py         Anthropic tool-use calls, validation, one retry then LLMError
   compare.py     deterministic diff and verdict
   escalation.py  escalation reasons (code, message, evidence)
@@ -182,8 +263,12 @@ logos/
   reports/       downloadable case reports: model.py (content), pdf.py, word.py, FORMATS registry
   service.py     storage operations: edits + audit log, category, escalate, resolve, delete, queries
   db.py          SQLAlchemy Core tables (emails, edit_log)
-  api.py         FastAPI endpoints, background run, static frontend
-frontend/        index.html, styles.css, app.js (no build step)
+  api.py         FastAPI endpoints and background run (API only, no web pages)
+frontend/        Next.js 16 + React 19 + TypeScript + Tailwind v4; the browser calls /api/*,
+                 which Next.js proxies to the backend (no CORS)
+  src/app/         routes: /, /review, /emails/[id]
+  src/components/  ui, layout, inbox, case, review
+  src/hooks/ src/providers/ src/lib/   data hooks, shared state, api client and helpers
 tests/           pytest suite
 loader.py        provided dataset loader (Inbox)
 ```
@@ -212,9 +297,9 @@ Interactive API docs are at http://localhost:8000/docs.
 pytest
 ```
 
-37 tests cover label normalization, the comparison diff, each escalation trigger, malformed-LLM retry,
+41 backend tests (plus 12 frontend tests, `cd frontend && npm test`) cover label normalization, the comparison diff, each escalation trigger, malformed-LLM retry,
 edit and audit-log behaviour with verdict recompute, category changes, deletion, and PDF/Word report generation. The LLM is stubbed,
-so no API key is needed. Prompt wording changes (such as the classification rules) are not covered by
+so no API key is needed.  Prompt wording changes (such as the classification rules) are not covered by
 the tests and should be checked with a real run.
 
 ## Code principles
@@ -237,7 +322,7 @@ the tests and should be checked with a real run.
 - **Testable by design.** The LLM layer is injectable and stubbed in tests, so the suite runs offline.
 - **Secure by default.** Secrets come from the environment and are git-ignored; all frontend output is
   HTML-escaped; database access uses parameterised queries.
-- **Small and dependency-light.** No orchestration framework and no frontend build step.
+- **Small and dependency-light.** No orchestration framework on the backend.
 
 Known limits: the reviewer name is not authenticated, `requirements.txt` is not version-pinned, and
 there is no linter configuration in the repo (the code was checked with `pyflakes`).
@@ -250,18 +335,5 @@ there is no linter configuration in the repo (the code was checked with `pyflake
 - Field excerpts show what the model originally extracted; they do not change when a reviewer edits a value.
 - The reviewer name is a plain text input standing in for auth; nothing verifies it.
 - Prompt rules: emails asking for or delivering a new SI are `SI_REQUEST` ("New SI"); emails asking us to send a draft BL are `GENERAL`.
-- Theme: flat, playful design on an eight-colour palette defined as tokens at the top of
-  `frontend/styles.css` (tangerine for main actions, sky for secondary buttons, sunshine for badges and
-  highlights, bubblegum/mint/lavender for stat cards and tags, plum for text and outlines, cream page
-  background). Link text uses a darker blue than Sky so it stays readable (4.9:1). Text on the tangerine
-  buttons is white (3.3:1, below the 4.5:1 AA guideline); plum text there would give 4.5:1. Status colours
-  (pink, green, amber) are tinted from the palette but stay distinct so meaning never depends on brand
-  colour alone. Reports use the same palette.
-- Prompt rules: emails asking for or delivering a new SI are `SI_REQUEST` ("New SI"); emails asking us to send a draft BL are `GENERAL`.
-- Theme: flat design on a six-colour palette defined as tokens at the top of `frontend/styles.css`
-  (burnt orange for primary actions, deep teal for links and secondary buttons, midnight navy for text
-  and the sidebar, honey for highlights, mist for cards, warm cream background). Text on the orange is white
-  (3.3:1, below the 4.5:1 AA guideline; a darker orange such as #B85A25 would fix that). Status colours (red/green/amber) stay separate so meaning is
-  never carried by brand colour alone. Reports use the same palette.
 - Deleted emails are re-processed the next time the pipeline runs.
 - The hackathon scoring uses five fixed categories, so no extra category (such as "Action item") was added.

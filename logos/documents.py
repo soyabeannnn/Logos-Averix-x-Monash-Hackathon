@@ -34,5 +34,15 @@ def attachment_text(inbox, path: str) -> str:
     raise ValueError(f"unsupported attachment type: {ext}")
 
 
+SCANNED_PDF_NOTE = "[Scanned PDF: no text layer, so the model read the page images directly.]"
+
+
+def scanned_pdf_bytes(inbox, path: str, text: str):
+    """The raw bytes of a PDF that opened but has no extractable text, else None."""
+    if path.rsplit(".", 1)[-1].lower() != "pdf" or is_readable(text):
+        return None
+    return inbox.read_bytes(path)
+
+
 def is_readable(text: str) -> bool:
     return len(text.strip()) >= MIN_READABLE_CHARS

@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from logos import config, db, llm, pipeline, service  # noqa: E402
+from logos import config, db, documents, llm, pipeline, service  # noqa: E402
 from logos.compare import compare, mismatched_fields, verdict  # noqa: E402
 from logos.escalation import disagreement_reasons, low_confidence_reason  # noqa: E402
 from logos.fields import FIELDS, normalize_label  # noqa: E402
@@ -235,3 +235,45 @@ def test_category_change_logs_and_switches_pipeline_state(store):
         service.change_category(store, "GENERAL", "Ana", " ", fake_process)
     with pytest.raises(service.ServiceError):
         service.change_category(store, "BL_COMPARISON", "Ana", "same", fake_process)
+
+
+# ---- scanned PDFs are read by the model instead of being escalated ----
+def _pdf_email(bl_pdf):
+    paths = ["attachments/email_901_SI.txt", "attachments/email_901_BL.pdf"]
+    return {**EMAIL, "attachments": paths}, FakeInbox({paths[0]: "x" * 100, paths[1]: bl_pdf})
+
+
+def test_scanned_pdf_is_sent_to_the_model_as_a_pdf(monkeypatch):
+    stub_llm(monkeypatch)
+    seen = {}
+    real = llm.extract_fields
+
+    def spy(text, doc, model=None, pdf=None):
+        seen[doc] = pdf
+        return real(text, doc)
+    monkeypatch.setattr(llm, "extract_fields", spy)
+    monkeypatch.setattr(pipeline, "attachment_text", lambda inbox, p: "" if p.endswith(".pdf") else "x" * 100)
+    email, inbox = _pdf_email("%PDF-scan")
+    row = pipeline.process_email(email, inbox)
+    assert seen["BL"] == b"%PDF-scan" and seen["SI"] is None
+    assert row["status"] == "OK" and row["bl_text"] == documents.SCANNED_PDF_NOTE
+
+
+def test_corrupt_pdf_still_escalates_and_is_not_sent_to_the_model(monkeypatch):
+    stub_llm(monkeypatch)
+
+    def cannot_open(inbox, p):
+        if p.endswith(".pdf"):
+            raise ValueError("Stream has ended unexpectedly")
+        return "x" * 100
+    monkeypatch.setattr(pipeline, "attachment_text", cannot_open)
+    email, inbox = _pdf_email("%PDF-broken")
+    row = pipeline.process_email(email, inbox)
+    assert row["status"] == "NEEDS_REVIEW"
+    assert [r["code"] for r in row["reasons"]] == ["unreadable"]
+
+
+def test_pdf_block_is_base64_document():
+    block = llm._pdf_block(b"abc")
+    assert block["type"] == "document" and block["source"]["media_type"] == "application/pdf"
+    assert block["source"]["data"] == "YWJj"

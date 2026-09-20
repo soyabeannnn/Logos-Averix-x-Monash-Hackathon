@@ -118,6 +118,5 @@ def test_report_endpoint_rejects_bad_requests(client):
     assert client.get("/emails/missing/report?format=pdf").status_code == 404
 
 
-def test_frontend_is_served_with_revalidation_header(client):
-    res = client.get("/app.js")
-    assert res.status_code == 200 and res.headers["cache-control"] == "no-cache"
+def test_health_endpoint(client):
+    assert client.get("/health").json() == {"status": "ok"}

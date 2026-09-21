@@ -50,6 +50,10 @@ function post<T>(path: string, payload: unknown = {}): Promise<T> {
   });
 }
 
+interface ChangedCount {
+  changed: number;
+}
+
 const emailPath = (id: string) => `/emails/${encodeURIComponent(id)}`;
 
 export const api = {
@@ -71,7 +75,9 @@ export const api = {
   escalate: (id: string, editor: string, note: string) =>
     post<EmailDetail>(`${emailPath(id)}/escalate`, { editor, note }),
   resolve: (id: string, editor: string) => post<EmailDetail>(`${emailPath(id)}/resolve`, { editor }),
-  deleteEmails: (ids: readonly string[]) => post<{ deleted: number }>("/emails/batch-delete", { ids }),
+  /** Archiving hides emails from the inbox but keeps their results and history; unarchiving restores them. */
+  archiveEmails: (ids: readonly string[]) => post<ChangedCount>("/emails/archive", { ids }),
+  unarchiveEmails: (ids: readonly string[]) => post<ChangedCount>("/emails/unarchive", { ids }),
 
   /** A URL (not a fetch) so the browser handles the file download. */
   reportUrl: (id: string, format: ReportFormat) => `${BASE}${emailPath(id)}/report?format=${format}`,

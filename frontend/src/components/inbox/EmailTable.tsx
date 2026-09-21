@@ -1,13 +1,19 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { TrashIcon } from "@/components/ui/Icons";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { formatConfidence, formatDateTime } from "@/lib/format";
 import type { EmailSummary } from "@/lib/types";
 
 const TH = "sticky top-0 z-[1] border-b-2 border-plum bg-lavender-soft px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-muted uppercase";
 const TD = "border-b border-line px-3 py-3 align-top";
+
+/** The icon button at the end of each row (archive in the inbox, unarchive in the archive). */
+export interface RowAction {
+  label: string;
+  icon: ReactNode;
+  onClick: (id: string) => void;
+}
 
 interface EmailTableProps {
   rows: readonly EmailSummary[];
@@ -17,10 +23,10 @@ interface EmailTableProps {
   emptyMessage: ReactNode;
   onToggle: (id: string, checked: boolean) => void;
   onToggleAll: (checked: boolean) => void;
-  onDelete: (id: string) => void;
+  action: RowAction;
 }
 
-export function EmailTable({ rows, selected, query, emptyMessage, onToggle, onToggleAll, onDelete }: EmailTableProps) {
+export function EmailTable({ rows, selected, query, emptyMessage, onToggle, onToggleAll, action }: EmailTableProps) {
   if (rows.length === 0) return <p className="p-[18px] text-muted">{emptyMessage}</p>;
 
   const allSelected = rows.every((row) => selected.has(row.id));
@@ -77,12 +83,12 @@ export function EmailTable({ rows, selected, query, emptyMessage, onToggle, onTo
                 </Link>
                 <button
                   type="button"
-                  onClick={() => onDelete(row.id)}
-                  aria-label={`Delete ${row.id}`}
-                  title="Delete"
-                  className="grid size-8 cursor-pointer place-items-center rounded-[10px] border-2 border-transparent text-muted hover:border-bad hover:bg-bad-bg hover:text-bad"
+                  onClick={() => action.onClick(row.id)}
+                  aria-label={`${action.label} ${row.id}`}
+                  title={action.label}
+                  className="grid size-8 cursor-pointer place-items-center rounded-[10px] border-2 border-transparent text-muted hover:border-plum hover:bg-lavender hover:text-plum"
                 >
-                  <TrashIcon />
+                  {action.icon}
                 </button>
               </div>
             </td>

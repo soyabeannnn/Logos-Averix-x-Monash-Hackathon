@@ -28,13 +28,15 @@ interface CaseNavProps {
   /** Query string of the inbox view the user came from; keeps Back and Previous/Next in that list. */
   query: string;
   neighbors: Neighbors | null;
+  /** The case was opened from the Archived list, so Back returns there. */
+  archived?: boolean;
 }
 
-export function CaseNav({ query, neighbors }: CaseNavProps) {
+export function CaseNav({ query, neighbors, archived = false }: CaseNavProps) {
   return (
     <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
-      <Link href={`/${query}`} className="font-medium text-link hover:underline">
-        ← Back to inbox
+      <Link href={`${archived ? "/archived" : "/"}${query}`} className="font-medium text-link hover:underline">
+        {archived ? "← Back to archive" : "← Back to inbox"}
       </Link>
       {neighbors && neighbors.total > 1 && (
         <nav aria-label="Browse cases" className="flex items-center gap-2.5">

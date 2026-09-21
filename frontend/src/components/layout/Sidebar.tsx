@@ -9,6 +9,7 @@ import { useStats } from "@/providers/StatsProvider";
 const NAV = [
   { href: "/", label: "Inbox", isActive: (path: string) => path === "/" || path.startsWith("/emails") },
   { href: "/review", label: "Needs Review", isActive: (path: string) => path.startsWith("/review") },
+  { href: "/archived", label: "Archived", isActive: (path: string) => path.startsWith("/archived") },
 ] as const;
 
 export function Sidebar() {
@@ -47,6 +48,9 @@ export function Sidebar() {
               {item.label}
               {item.href === "/review" && stats && stats.needs_review > 0 && (
                 <span className="rounded-[10px] bg-bubblegum px-2 text-xs font-semibold text-plum">{stats.needs_review}</span>
+              )}
+              {item.href === "/archived" && stats && stats.archived > 0 && (
+                <span className="rounded-[10px] bg-lavender px-2 text-xs font-semibold text-plum">{stats.archived}</span>
               )}
             </Link>
           );

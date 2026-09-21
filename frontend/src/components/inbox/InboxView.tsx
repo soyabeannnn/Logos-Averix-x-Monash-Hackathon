@@ -1,19 +1,19 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
 import { LinkButton } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { FormError } from "@/components/ui/Fields";
+import { ArchiveIcon } from "@/components/ui/Icons";
+import { useArchive } from "@/hooks/useArchive";
 import { useProcessRun } from "@/hooks/useProcessRun";
 import { useRemote } from "@/hooks/useRemote";
+import { useRowSelection } from "@/hooks/useRowSelection";
 import { api } from "@/lib/api";
 import { CATEGORY_LABELS, STATUS_LABELS } from "@/lib/constants";
-import { errorText } from "@/lib/format";
 import { filtersFromParams, filtersToQuery, type EmailFilters } from "@/lib/filters";
 import type { Category, Status } from "@/lib/types";
 import { useStats } from "@/providers/StatsProvider";
-import { useToast } from "@/providers/ToastProvider";
 import { CategoryPills } from "./CategoryPills";
 import { EmailTable } from "./EmailTable";
 import { RunControls } from "./RunControls";
@@ -33,10 +33,9 @@ function describeFilters({ category, status, q }: EmailFilters): string {
 export function InboxView() {
   const router = useRouter();
   const pathname = usePathname();
-  const filters = filtersFromParams(useSearchParams());
-  const { toast } = useToast();
+  // The inbox only ever lists active emails; archived ones live on the Archived page.
+  const filters = { ...filtersFromParams(useSearchParams()), archived: "" };
   const { stats, refresh: refreshStats } = useStats();
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 
   const emails = useRemote(() => api.emails(filters), [filters.category, filters.status, filters.q]);
   const run = useProcessRun(() => {
@@ -45,45 +44,16 @@ export function InboxView() {
   });
 
   const rows = emails.data ?? [];
-  const selectedIds = rows.filter((row) => selected.has(row.id)).map((row) => row.id);
+  const { selected, selectedIds, toggle, toggleAll, deselect } = useRowSelection(rows);
+  const { archive } = useArchive(emails.reload);
   const hasFilters = Boolean(filters.category || filters.status || filters.q);
 
   function applyFilters(patch: Partial<EmailFilters>) {
     router.replace(`${pathname}${filtersToQuery({ ...filters, ...patch })}`);
   }
 
-  function toggle(id: string, checked: boolean) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }
-
-  function toggleAll(checked: boolean) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      rows.forEach((row) => (checked ? next.add(row.id) : next.delete(row.id)));
-      return next;
-    });
-  }
-
-  async function deleteEmails(ids: readonly string[], label: string) {
-    const them = ids.length === 1 ? "it" : "them";
-    const ok = window.confirm(
-      `Delete ${label}? This also removes any edit history for ${them}. Running the pipeline again will re-process ${them}.`,
-    );
-    if (!ok) return;
-    try {
-      const { deleted } = await api.deleteEmails(ids);
-      setSelected((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
-      toast(`Deleted ${deleted} email(s).`);
-      emails.reload();
-      refreshStats();
-    } catch (error) {
-      toast(errorText(error));
-    }
+  async function archiveEmails(ids: readonly string[]) {
+    if (await archive(ids)) deselect(ids);
   }
 
   return (
@@ -99,7 +69,7 @@ export function InboxView() {
           selectedCount={selectedIds.length}
           onStart={run.start}
           onCancel={run.cancel}
-          onDeleteSelected={() => deleteEmails(selectedIds, `${selectedIds.length} selected email(s)`)}
+          onArchiveSelected={() => archiveEmails(selectedIds)}
         />
       </div>
 
@@ -126,7 +96,7 @@ export function InboxView() {
           }
           onToggle={toggle}
           onToggleAll={toggleAll}
-          onDelete={(id) => deleteEmails([id], id)}
+          action={{ label: "Archive", icon: <ArchiveIcon />, onClick: (id) => archiveEmails([id]) }}
         />
       </Card>
     </>

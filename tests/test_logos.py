@@ -207,16 +207,62 @@ def test_cannot_resolve_with_missing_fields(store):
     assert e.value.status == 409
 
 
-def test_delete_removes_email_and_its_edit_log(store):
+def ids(rows):
+    return [r["id"] for r in rows]
+
+
+def test_archive_hides_email_but_keeps_its_data_and_history(store):
     service.apply_edit(store, "BL", "consignee", "BETA CO", "Ana", "typo")
-    assert service.delete_emails([store]) == {"deleted": 1}
+    assert service.set_archived([store], True) == {"changed": 1}
+    assert ids(service.list_emails()) == [] and ids(service.list_emails(archived=True)) == [store]
+    d = service.detail(store)  # still readable, with its edit history and an archive stamp
+    assert d["archived_at"] and len(d["edit_log"]) == 1
+
+
+def test_unarchive_restores_email_to_the_inbox(store):
+    service.set_archived([store], True)
+    assert service.set_archived([store], False) == {"changed": 1}
+    assert ids(service.list_emails()) == [store] and service.list_emails(archived=True) == []
+    assert service.detail(store)["archived_at"] is None
+
+
+def test_archiving_is_idempotent_and_validates_input(store):
+    assert service.set_archived([store, store], True) == {"changed": 1}
+    assert service.set_archived([store], True) == {"changed": 0}  # already archived
+    assert service.set_archived([store], False) == {"changed": 1}
     with pytest.raises(service.ServiceError) as e:
-        service.detail(store)
+        service.set_archived([], True)
+    assert e.value.status == 400
+    with pytest.raises(service.ServiceError) as e:
+        service.set_archived(["nope"], True)
     assert e.value.status == 404
-    with db.get_engine().connect() as c:
-        assert c.execute(sa.select(sa.func.count()).select_from(db.edit_log)).scalar() == 0
-    with pytest.raises(service.ServiceError):
-        service.delete_emails([])
+
+
+def test_archived_emails_leave_stats_and_review_queue(store):
+    assert service.stats()["total"] == 1 and service.stats()["archived"] == 0
+    assert ids(service.review_queue()) == [store]
+    service.set_archived([store], True)
+    s = service.stats()
+    assert (s["total"], s["needs_review"], s["archived"], s["by_category"]) == (0, 0, 1, {})
+    assert service.review_queue() == []
+
+
+def test_reprocessing_keeps_an_email_archived(store):
+    service.set_archived([store], True)
+    service.save_row(pipeline.process_email(EMAIL, DOCS))
+    assert ids(service.list_emails(archived=True)) == [store] and service.list_emails() == []
+
+
+def test_schema_upgrade_adds_archived_column_to_an_older_database():
+    engine = sa.create_engine("sqlite://", poolclass=sa.pool.StaticPool,
+                              connect_args={"check_same_thread": False})
+    with engine.begin() as c:
+        c.execute(sa.text("CREATE TABLE emails (id VARCHAR PRIMARY KEY, subject VARCHAR)"))
+        c.execute(sa.text("INSERT INTO emails (id, subject) VALUES ('old', 's')"))
+    db.set_engine(engine)
+    assert "archived_at" in {c["name"] for c in sa.inspect(engine).get_columns("emails")}
+    with engine.connect() as c:
+        assert c.execute(sa.text("SELECT archived_at FROM emails")).scalar() is None
 
 
 def test_category_change_logs_and_switches_pipeline_state(store):

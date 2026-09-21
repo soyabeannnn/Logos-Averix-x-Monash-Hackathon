@@ -110,8 +110,9 @@ def process_status():
 
 
 @app.get("/emails")
-def list_emails(category: Optional[str] = None, status: Optional[str] = None, q: Optional[str] = None):
-    return service.list_emails(category, status, q)
+def list_emails(category: Optional[str] = None, status: Optional[str] = None, q: Optional[str] = None,
+                archived: bool = False):
+    return service.list_emails(category, status, q, archived)
 
 
 @app.get("/health")
@@ -147,18 +148,18 @@ def get_source(email_id: str):
     return service.source(email_id)
 
 
-class DeleteIn(BaseModel):
+class IdsIn(BaseModel):
     ids: list[str]
 
 
-@app.post("/emails/batch-delete")
-def batch_delete(body: DeleteIn):
-    return service.delete_emails(body.ids)
+@app.post("/emails/archive")
+def archive_emails(body: IdsIn):
+    return service.set_archived(body.ids, True)
 
 
-@app.delete("/emails/{email_id}")
-def delete_email(email_id: str):
-    return service.delete_emails([email_id])
+@app.post("/emails/unarchive")
+def unarchive_emails(body: IdsIn):
+    return service.set_archived(body.ids, False)
 
 
 @app.post("/emails/{email_id}/edit")

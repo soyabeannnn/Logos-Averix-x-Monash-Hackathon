@@ -11,6 +11,30 @@ container count, gross weight (kg). The SI is the source of truth.
 
 ## Setup
 
+### Quick setup (script)
+
+You need Python 3.10+, Node.js 20.9+ and the dataset (see Prerequisites below). Then one script does
+steps 2 to 3: it creates `.venv`, installs the backend and frontend dependencies, and creates `.env`
+(offering to save your Anthropic API key, typed hidden). It is safe to re-run.
+
+**Windows (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup.ps1          # set up
+powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Start   # set up, then open both servers and the browser
+```
+
+**macOS / Linux (Terminal):**
+
+```bash
+chmod +x setup.sh          # first time only
+./setup.sh                 # set up
+./setup.sh --start         # set up, then run both servers together (Ctrl+C stops both)
+```
+
+Without `-Start` / `--start`, the script prints the two commands to run (see step 4). Prefer to do it by
+hand, or something failed? The manual steps follow.
+
 ### 1. Prerequisites
 
 - **Python 3.10 or newer** (check with `python --version`).
@@ -202,9 +226,14 @@ Then open http://localhost:3000.
 ## Using the app
 
 - **Inbox**: search, category pills, four stat cards (click one to filter by status), and a scrollable
-  table of emails. Each row has a checkbox and a trash icon for deleting (single or batch). Comparison
-  emails link to **View →**; every other category links to **Source →**. **Run pipeline** shows live
-  progress and has a **Cancel** button (in-flight emails finish first); a pop-up reports the result.
+  table of emails. Each row has a checkbox and an archive icon (single or batch, via **Archive
+  selected**). Comparison emails link to **View →**; every other category links to **Source →**.
+  **Run pipeline** shows live progress and has a **Cancel** button (in-flight emails finish first); a
+  pop-up reports the result.
+- **Archived**: emails you archived, with search. Archiving hides an email from the Inbox, the counts and
+  Needs Review but deletes nothing: its results, edits and history are kept. Use the unarchive icon on a
+  row (or **Unarchive selected**) to restore it; opening an archived case also shows an **Unarchive**
+  button. Archived emails are skipped when the pipeline runs again.
 - **Comparison detail**: metadata, a side-by-side SI vs BL table with mismatches highlighted, a verdict
   banner, **Escalate to Team**, **View Source** (raw email body and SI/BL text) and **Mark Resolved**.
   **Download PDF** and **Download Word** export the case as a report (metadata, verdict, comparison
@@ -261,7 +290,7 @@ logos/
   escalation.py  escalation reasons (code, message, evidence)
   pipeline.py    classify -> extract -> compare -> escalate for one email
   reports/       downloadable case reports: model.py (content), pdf.py, word.py, FORMATS registry
-  service.py     storage operations: edits + audit log, category, escalate, resolve, delete, queries
+  service.py     storage operations: edits + audit log, category, escalate, resolve, archive, queries
   db.py          SQLAlchemy Core tables (emails, edit_log)
   api.py         FastAPI endpoints and background run (API only, no web pages)
 frontend/        Next.js 16 + React 19 + TypeScript + Tailwind v4; the browser calls /api/*,
@@ -277,17 +306,17 @@ loader.py        provided dataset loader (Inbox)
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /emails?category=&status=&q=` | list emails |
+| `GET /emails?category=&status=&q=&archived=` | list active emails, or archived ones with `archived=true` |
 | `GET /emails/{id}` | detail: comparison rows, escalations, evidence, edit log |
 | `GET /emails/{id}/source` | email body and raw SI/BL text |
 | `GET /emails/{id}/report?format=pdf\|docx` | download the comparison report (comparison emails only) |
 | `POST /emails/{id}/edit` | `{doc: SI\|BL, field, new_value, editor, reason}` |
 | `POST /emails/{id}/category` | `{category, editor, reason}` |
 | `POST /emails/{id}/escalate`, `/resolve` | `{editor, note}` |
-| `DELETE /emails/{id}`, `POST /emails/batch-delete` | delete one / `{ids: [...]}` (also removes edit history) |
+| `POST /emails/archive`, `POST /emails/unarchive` | `{ids: [...]}`; hide from / restore to the inbox. Returns `{changed: n}`; nothing is deleted |
 | `GET /review-queue` | escalated cases with reason and evidence |
 | `POST /process[?force=true]`, `POST /process/cancel`, `GET /process/status` | run, cancel, poll |
-| `GET /stats` | dashboard counts |
+| `GET /stats` | dashboard counts for active emails, plus `archived` |
 
 Interactive API docs are at http://localhost:8000/docs.
 
@@ -335,5 +364,7 @@ there is no linter configuration in the repo (the code was checked with `pyflake
 - Field excerpts show what the model originally extracted; they do not change when a reviewer edits a value.
 - The reviewer name is a plain text input standing in for auth; nothing verifies it.
 - Prompt rules: emails asking for or delivering a new SI are `SI_REQUEST` ("New SI"); emails asking us to send a draft BL are `GENERAL`.
-- Deleted emails are re-processed the next time the pipeline runs.
+- There is no delete: archiving is the way to clear the inbox, and it is reversible. Archived emails are
+  not re-processed by a normal run, and stay archived even if `POST /process?force=true` reprocesses them.
+  An existing `logos.db` gains the `archived_at` column automatically on the next start.
 - The hackathon scoring uses five fixed categories, so no extra category (such as "Action item") was added.

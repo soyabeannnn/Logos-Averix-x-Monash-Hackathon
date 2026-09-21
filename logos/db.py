@@ -28,6 +28,7 @@ emails = sa.Table(
     sa.Column("resolved_by", sa.String),
     sa.Column("resolved_at", sa.String),
     sa.Column("escalated_by", sa.String),
+    sa.Column("archived_at", sa.String),  # set = hidden from the inbox and review queue
 )
 
 edit_log = sa.Table(
@@ -46,16 +47,27 @@ edit_log = sa.Table(
 _engine = None
 
 
+def _create_schema(engine):
+    """create_all() never alters an existing table, so add any column an older database lacks."""
+    metadata.create_all(engine)
+    have = {c["name"] for c in sa.inspect(engine).get_columns(emails.name)}
+    with engine.begin() as conn:
+        for column in emails.columns:
+            if column.name not in have:
+                conn.execute(sa.text(
+                    f"ALTER TABLE {emails.name} ADD COLUMN {column.name} {column.type.compile(engine.dialect)}"))
+
+
 def get_engine():
     global _engine
     if _engine is None:
         kwargs = {"connect_args": {"check_same_thread": False}} if config.DATABASE_URL.startswith("sqlite") else {}
         _engine = sa.create_engine(config.DATABASE_URL, **kwargs)
-        metadata.create_all(_engine)
+        _create_schema(_engine)
     return _engine
 
 
 def set_engine(engine):
     global _engine
     _engine = engine
-    metadata.create_all(engine)
+    _create_schema(engine)

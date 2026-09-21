@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { LoadingNote } from "@/components/ui/Loading";
+import { useArchive } from "@/hooks/useArchive";
 import { useCaseActions } from "@/hooks/useCaseActions";
 import { useRemote } from "@/hooks/useRemote";
 import { api } from "@/lib/api";
@@ -12,6 +13,7 @@ import { filtersFromParams, filtersToQuery } from "@/lib/filters";
 import { neighbors } from "@/lib/neighbors";
 import type { Category } from "@/lib/types";
 import { useToast } from "@/providers/ToastProvider";
+import { ArchivedBanner } from "./ArchivedBanner";
 import { CaseActionsBar } from "./CaseActionsBar";
 import { CaseMeta } from "./CaseMeta";
 import { CaseNav } from "./CaseNav";
@@ -31,11 +33,17 @@ export function CaseDetailView({ id }: { id: string }) {
   const [escalating, setEscalating] = useState(false);
 
   const detail = useRemote(() => api.email(id), [id]);
-  const siblings = useRemote(() => api.emails(filters), [filters.category, filters.status, filters.q]);
+  const siblings = useRemote(() => api.emails(filters), [filters.category, filters.status, filters.q, filters.archived]);
   const actions = useCaseActions(id, detail.reload);
+  const { unarchive } = useArchive(detail.reload);
+  const fromArchive = filters.archived === "1";
 
   /** After a case changes state, drop the inbox filters so it is still visible when the user goes back. */
   const clearFilters = () => router.replace(`/emails/${encodeURIComponent(id)}`);
+
+  async function unarchiveCase() {
+    if (await unarchive([id])) clearFilters(); // it now belongs to the inbox list
+  }
 
   async function resolve() {
     const failure = await actions.resolve();
@@ -59,7 +67,7 @@ export function CaseDetailView({ id }: { id: string }) {
   if (!data) {
     return detail.error ? (
       <>
-        <CaseNav query={query} neighbors={null} />
+        <CaseNav query={query} neighbors={null} archived={fromArchive} />
         <p role="alert" className="text-bad">{detail.error}</p>
         <Link href="/" className="font-medium text-link hover:underline">Return to the inbox</Link>
       </>
@@ -73,8 +81,9 @@ export function CaseDetailView({ id }: { id: string }) {
 
   return (
     <>
-      <CaseNav query={query} neighbors={neighbors(siblingIds, id)} />
+      <CaseNav query={query} neighbors={neighbors(siblingIds, id)} archived={fromArchive} />
       <h1 className="mb-4 text-2xl font-semibold">{data.subject}</h1>
+      {data.archived_at && <ArchivedBanner archivedAt={data.archived_at} onUnarchive={unarchiveCase} />}
 
       <CaseMeta detail={data} onChangeCategory={changeCategory} />
       <VerdictBanner detail={data} />

@@ -4,9 +4,11 @@ export interface EmailFilters {
   category: string;
   status: string;
   q: string;
+  /** "1" lists archived emails instead of active ones. */
+  archived: string;
 }
 
-export const EMPTY_FILTERS: EmailFilters = { category: "", status: "", q: "" };
+export const EMPTY_FILTERS: EmailFilters = { category: "", status: "", q: "", archived: "" };
 
 interface ParamReader {
   get(name: string): string | null;
@@ -17,10 +19,11 @@ export function filtersFromParams(params: ParamReader): EmailFilters {
     category: params.get("category") ?? "",
     status: params.get("status") ?? "",
     q: params.get("q") ?? "",
+    archived: params.get("archived") ?? "",
   };
 }
 
-/** Returns "?category=..&status=.." with empty values omitted, or "" when nothing is set. */
+/** Returns "?category=..&status=.." (also q and archived) with empty values omitted, or "" when nothing is set. */
 export function filtersToQuery(filters: Partial<EmailFilters>): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {

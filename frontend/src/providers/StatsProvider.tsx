@@ -7,7 +7,7 @@ import type { Stats } from "@/lib/types";
 
 interface StatsApi {
   stats: Stats | undefined;
-  /** Call after anything that can change counts (run, edit, resolve, delete, category change). */
+  /** Call after anything that can change counts (run, edit, resolve, archive, category change). */
   refresh: () => void;
 }
 

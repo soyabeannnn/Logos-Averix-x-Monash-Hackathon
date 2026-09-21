@@ -33,6 +33,8 @@ export interface EmailSummary {
   processed_at: string;
   shipment_ref: string | null;
   resolved_by: string | null;
+  /** Set when the email is archived (hidden from the inbox and review queue). */
+  archived_at: string | null;
 }
 
 export interface Reason {
@@ -96,6 +98,8 @@ export interface Stats {
   mismatches: number;
   needs_review: number;
   clean: number;
+  /** Archived emails; every other count covers active emails only. */
+  archived: number;
   by_category: Partial<Record<Category, number>>;
 }
 

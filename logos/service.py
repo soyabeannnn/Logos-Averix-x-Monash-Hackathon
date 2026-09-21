@@ -18,11 +18,14 @@ class ServiceError(Exception):
 
 
 def save_row(row):
+    """Insert or replace a processed email. Reprocessing keeps the email archived if it was."""
     eng = db.get_engine()
     with eng.begin() as c:
+        archived_at = c.execute(
+            sa.select(db.emails.c.archived_at).where(db.emails.c.id == row["id"])).scalar()
         c.execute(sa.delete(db.emails).where(db.emails.c.id == row["id"]))
         c.execute(sa.delete(db.edit_log).where(db.edit_log.c.email_id == row["id"]))
-        c.execute(sa.insert(db.emails).values(**row))
+        c.execute(sa.insert(db.emails).values(**{**row, "archived_at": archived_at}))
 
 
 def processed_ids():
@@ -46,11 +49,17 @@ def comparison_rows(row):
 def summary(row):
     return {k: row[k] for k in (
         "id", "sender", "subject", "category", "confidence", "status",
-        "processed_at", "shipment_ref", "resolved_by")}
+        "processed_at", "shipment_ref", "resolved_by", "archived_at")}
 
 
-def list_emails(category=None, status=None, q=None):
-    stmt = sa.select(db.emails).order_by(db.emails.c.id)
+def _in_view(archived):
+    """SQL condition selecting archived or active (not archived) emails."""
+    col = db.emails.c.archived_at
+    return col.is_not(None) if archived else col.is_(None)
+
+
+def list_emails(category=None, status=None, q=None, archived=False):
+    stmt = sa.select(db.emails).where(_in_view(archived)).order_by(db.emails.c.id)
     with db.get_engine().connect() as c:
         rows = [dict(r) for r in c.execute(stmt).mappings()]
     out = []
@@ -66,14 +75,18 @@ def list_emails(category=None, status=None, q=None):
 
 
 def stats():
+    """Dashboard counts for active emails only; archived ones are counted separately."""
     with db.get_engine().connect() as c:
-        rows = list(c.execute(sa.select(db.emails.c.status, db.emails.c.category)))
+        rows = list(c.execute(sa.select(db.emails.c.status, db.emails.c.category).where(_in_view(False))))
+        archived = c.execute(
+            sa.select(sa.func.count()).select_from(db.emails).where(_in_view(True))).scalar()
     statuses = [r[0] for r in rows]
     by_category = {}
     for _, cat in rows:
         by_category[cat] = by_category.get(cat, 0) + 1
     return {
         "by_category": by_category,
+        "archived": archived,
         "total": len(statuses),
         "mismatches": statuses.count("MISMATCH"),
         "needs_review": statuses.count("NEEDS_REVIEW"),
@@ -110,7 +123,8 @@ def source(email_id):
 def review_queue():
     with db.get_engine().connect() as c:
         rows = [dict(r) for r in c.execute(
-            sa.select(db.emails).where(db.emails.c.status == "NEEDS_REVIEW").order_by(db.emails.c.id)).mappings()]
+            sa.select(db.emails).where(db.emails.c.status == "NEEDS_REVIEW", _in_view(False))
+            .order_by(db.emails.c.id)).mappings()]
     return [{**summary(r), "reasons": r["reasons"], "escalated_by": r["escalated_by"]} for r in rows]
 
 
@@ -147,16 +161,23 @@ def change_category(email_id, new_category, editor, reason_text, process_fn):
     return detail(email_id)
 
 
-def delete_emails(ids):
+def set_archived(ids, archived):
+    """Archive or unarchive emails. Nothing is removed: results, edits and history are kept.
+
+    Returns how many emails actually changed; ones already in the requested state are skipped.
+    """
     ids = list(dict.fromkeys(ids))
     if not ids:
         raise ServiceError(400, "No emails selected")
     with db.get_engine().begin() as c:
-        c.execute(sa.delete(db.edit_log).where(db.edit_log.c.email_id.in_(ids)))
-        res = c.execute(sa.delete(db.emails).where(db.emails.c.id.in_(ids)))
-    if res.rowcount == 0:
-        raise ServiceError(404, "Email not found")
-    return {"deleted": res.rowcount}
+        found = c.execute(
+            sa.select(sa.func.count()).select_from(db.emails).where(db.emails.c.id.in_(ids))).scalar()
+        if not found:
+            raise ServiceError(404, "Email not found")
+        res = c.execute(sa.update(db.emails)
+                        .where(db.emails.c.id.in_(ids), _in_view(not archived))
+                        .values(archived_at=now() if archived else None))
+    return {"changed": res.rowcount}
 
 
 def parse_value(field, raw):
